@@ -11,6 +11,7 @@
 		B06F75EF2ADADF27003D897B /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B06F75EE2ADADF27003D897B /* ContentView.swift */; };
 		B06F75F12ADADF29003D897B /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = B06F75F02ADADF29003D897B /* Assets.xcassets */; };
 		B06F75F42ADADF29003D897B /* Preview Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = B06F75F32ADADF29003D897B /* Preview Assets.xcassets */; };
+		B06F75FC2ADAEBF2003D897B /* CameraView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B06F75FB2ADAEBF2003D897B /* CameraView.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -19,6 +20,8 @@
 		B06F75EE2ADADF27003D897B /* ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
 		B06F75F02ADADF29003D897B /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		B06F75F32ADADF29003D897B /* Preview Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = "Preview Assets.xcassets"; sourceTree = "<group>"; };
+		B06F75FA2ADAEB9D003D897B /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
+		B06F75FB2ADAEBF2003D897B /* CameraView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CameraView.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -51,8 +54,10 @@
 		B06F75EB2ADADF27003D897B /* UtuKuwagataCamera */ = {
 			isa = PBXGroup;
 			children = (
+				B06F75FA2ADAEB9D003D897B /* Info.plist */,
 				B06F75EC2ADADF27003D897B /* UtuKuwagataCameraApp.swift */,
 				B06F75EE2ADADF27003D897B /* ContentView.swift */,
+				B06F75FB2ADAEBF2003D897B /* CameraView.swift */,
 				B06F75F02ADADF29003D897B /* Assets.xcassets */,
 				B06F75F22ADADF29003D897B /* Preview Content */,
 			);
@@ -139,6 +144,7 @@
 			files = (
 				B06F75EF2ADADF27003D897B /* ContentView.swift in Sources */,
 				B06F75ED2ADADF27003D897B /* UtuKuwagataCameraApp.swift in Sources */,
+				B06F75FC2ADAEBF2003D897B /* CameraView.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -275,6 +281,9 @@
 				DEVELOPMENT_TEAM = CW97U5J24N;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = UtuKuwagataCamera/Info.plist;
+				INFOPLIST_KEY_NSCameraUsageDescription = "$(CURRENT_PROJECT_VERSION)";
+				INFOPLIST_KEY_NSPhotoLibraryUsageDescription = "";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
@@ -304,6 +313,9 @@
 				DEVELOPMENT_TEAM = CW97U5J24N;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = UtuKuwagataCamera/Info.plist;
+				INFOPLIST_KEY_NSCameraUsageDescription = "$(CURRENT_PROJECT_VERSION)";
+				INFOPLIST_KEY_NSPhotoLibraryUsageDescription = "";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
