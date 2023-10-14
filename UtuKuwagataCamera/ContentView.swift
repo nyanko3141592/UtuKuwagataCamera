@@ -1,107 +1,123 @@
-//
-//  ContentView.swift
-//  UtuKuwagataCamera
-//
-//  Created by 高橋直希 on 2023/10/14.
-//
+import AVFoundation
+import PhotosUI
 import SwiftUI
 
-// 主要なビューを定義
-struct ContentView: View {
-    // 撮影または選択された画像を保持するためのState
-    @State private var image: UIImage?
-    // カメラオーバーレイとして使用する画像を保持するためのState
-    @State private var selectedImage: UIImage?
-    // ImagePicker表示のトグル
-    @State private var isImagePickerDisplayed: Bool = false
-    // CameraView表示のトグル
-    @State private var isCameraDisplayed: Bool = false
-
+struct TopScreen: View {
+    @State private var isImagePickerDisplayed = false
+    @State private var selectedImage: UIImage? = UIImage(named: "defaultImage")
+    @State private var navigateToCamera = false
+    
     var body: some View {
-        VStack(spacing: 20) {
-            // 最初に合成された画像（image）が存在するかどうかを確認
-            if let image = image {
-                Image(uiImage: image)
-                    .resizable()
-                    .scaledToFit()
-                    .frame(width: 300, height: 300)
+        let bounds = UIScreen.main.bounds
+        let width = Int(bounds.width)
+        let height = Int(bounds.height)
+        NavigationView {
+            VStack(spacing: 5) {
+                Text("鬱クワガタカメラ").font(.title).padding()
+                Group {
+                    Text("使い方").font(.title2)
+                    Text("1. 自分の鬱クワガタを撮影")
+                    Text("2. 写真アプリでクワガタを長押しして被写体を選択")
+                    Text("3. 共有から写真に保存")
+                    Button("4. あなたのクワガタをカメラロールから選択") {
+                        isImagePickerDisplayed.toggle()
+                    }.imagePicker(isPresented: $isImagePickerDisplayed, image: $selectedImage)
+                }.frame(maxWidth: .infinity, alignment: .leading)
+                Spacer()
+                Group {
+                    Text("現在のクワガタ").font(.headline).padding()
+                    if let image = selectedImage {
+                        Button(action: {
+                            isImagePickerDisplayed.toggle()
+                        }) {
+                            Image(uiImage: image)
+                                .resizable()
+                                .scaledToFit()
+                                .frame(width: CGFloat(width) / 2, height: CGFloat(width) / 2)
+                                .background(Color.blue)
+                        }.imagePicker(isPresented: $isImagePickerDisplayed, image: $selectedImage)
+                    } else {
+                        Text("No Image Selected")
+                    }
+                }
+                
+                Spacer()
+                if selectedImage != nil {
+                    NavigationLink(destination: CameraScreen(blendImage: selectedImage!), isActive: $navigateToCamera) {
+                        Button(action: {
+                            navigateToCamera = true
+                        }) {
+                            Text("鬱クワガタを撮影")
+                                .bold()
+                                .padding()
+                                .frame(height: 50)
+                                .foregroundColor(Color.white)
+                                .background(Color.blue)
+                                .cornerRadius(25)
+                        }
+                    }
+                }
             }
-            // 合成された画像がない場合、選択された画像を表示
-            else if let selectedImage = selectedImage {
-                Image(uiImage: selectedImage)
-                    .resizable()
-                    .scaledToFit()
-                    .frame(width: 300, height: 300)
-            }
-            // どちらの画像も存在しない場合、テキストを表示
-            else {
-                Text("画像が選択されていません")
-            }
-
-            // カメラロールからの画像選択ボタン
-            Button("カメラロールから画像を選択") {
-                isImagePickerDisplayed = true
-            }
-
-            // カメラを起動するボタン
-            Button("カメラを開く") {
-                isCameraDisplayed = true
-            }
-        }
-        // ImagePickerの表示
-        .sheet(isPresented: $isImagePickerDisplayed) {
-            ImagePicker(image: $selectedImage, sourceType: .photoLibrary)
-        }
-        // CameraViewの表示
-        .sheet(isPresented: $isCameraDisplayed) {
-            CameraView(image: $image, selectedImage: $selectedImage, isImagePickerDisplayed: $isCameraDisplayed)
+            .padding()
         }
     }
 }
 
-// カメラロールから画像を選択するためのビューを定義
+// Custom modifier for ImagePicker
 struct ImagePicker: UIViewControllerRepresentable {
-    // 選択された画像を保持するためのBindableなUIImage
+    @Binding var isPresented: Bool
     @Binding var image: UIImage?
-    // 画像ソースのタイプ（カメラ、フォトライブラリなど）
-    var sourceType: UIImagePickerController.SourceType
-
-    // UIImagePickerControllerのデリゲートとして機能するCoordinator
-    class Coordinator: NSObject, UINavigationControllerDelegate, UIImagePickerControllerDelegate {
-        let parent: ImagePicker
-
-        init(_ parent: ImagePicker) {
-            self.parent = parent
-        }
-
-        // 画像が選択されたときに呼ばれるデリゲートメソッド
-        func imagePickerController(_ picker: UIImagePickerController, didFinishPickingMediaWithInfo info: [UIImagePickerController.InfoKey: Any]) {
-            if let uiImage = info[.originalImage] as? UIImage {
-                parent.image = uiImage
-            }
-
-            picker.dismiss(animated: true)
-        }
-
-        // ImagePickerがキャンセルされたときに呼ばれるデリゲートメソッド
-        func imagePickerControllerDidCancel(_ picker: UIImagePickerController) {
-            picker.dismiss(animated: true)
-        }
-    }
-
-    // SwiftUIからCoordinatorを作成するためのメソッド
-    func makeCoordinator() -> Coordinator {
-        Coordinator(self)
-    }
-
-    // SwiftUIから初めてUIViewControllerが要求されるときに呼ばれるメソッド
-    func makeUIViewController(context: UIViewControllerRepresentableContext<ImagePicker>) -> UIImagePickerController {
+    
+    func makeUIViewController(context: Context) -> some UIViewController {
         let picker = UIImagePickerController()
         picker.delegate = context.coordinator
-        picker.sourceType = sourceType
         return picker
     }
+    
+    func updateUIViewController(_ uiViewController: UIViewControllerType, context: Context) {}
+    
+    func makeCoordinator() -> Coordinator {
+        Coordinator(parent: self)
+    }
+    
+    class Coordinator: NSObject, UIImagePickerControllerDelegate, UINavigationControllerDelegate {
+        let parent: ImagePicker
+        
+        init(parent: ImagePicker) {
+            self.parent = parent
+        }
+        
+        func imagePickerController(_ picker: UIImagePickerController, didFinishPickingMediaWithInfo info: [UIImagePickerController.InfoKey: Any]) {
+            if let uiImage = info[UIImagePickerController.InfoKey.originalImage] as? UIImage {
+                parent.image = uiImage
+            }
+            parent.isPresented = false
+        }
+        
+        func imagePickerControllerDidCancel(_ picker: UIImagePickerController) {
+            parent.isPresented = false
+        }
+    }
+}
 
-    // SwiftUIがUIViewControllerを更新する必要があるときに呼ばれるメソッド（ここでは何もしない）
-    func updateUIViewController(_ uiViewController: UIImagePickerController, context: UIViewControllerRepresentableContext<ImagePicker>) {}
+extension View {
+    func imagePicker(isPresented: Binding<Bool>, image: Binding<UIImage?>) -> some View {
+        modifier(ImagePickerModifier(isPresented: isPresented, image: image))
+    }
+}
+
+struct ImagePickerModifier: ViewModifier {
+    @Binding var isPresented: Bool
+    @Binding var image: UIImage?
+    
+    func body(content: Content) -> some View {
+        content
+            .sheet(isPresented: $isPresented, content: {
+                ImagePicker(isPresented: $isPresented, image: $image)
+            })
+    }
+}
+
+#Preview {
+    TopScreen()
 }

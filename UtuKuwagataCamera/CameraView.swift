@@ -4,23 +4,13 @@
 //
 //  Created by 高橋直希 on 2023/10/15.
 //
-
 import SwiftUI
-import UIKit
+import AVFoundation
 
-// SwiftUIとUIKitをブリッジするカスタムビューを定義
 struct CameraView: UIViewControllerRepresentable {
-    
-    // 撮影した画像を保存するためのBindableなUIImage
     @Binding var image: UIImage?
-    
-    // カメラ上にオーバーレイする画像のBindableなUIImage
     @Binding var selectedImage: UIImage?
     
-    // ImagePickerが表示されているかどうかを制御するBindableなBool
-    @Binding var isImagePickerDisplayed: Bool
-
-    // CoordinatorはUIImagePickerControllerのデリゲートとして機能するクラス
     class Coordinator: NSObject, UINavigationControllerDelegate, UIImagePickerControllerDelegate {
         let parent: CameraView
 
@@ -28,51 +18,109 @@ struct CameraView: UIViewControllerRepresentable {
             self.parent = parent
         }
 
-        // 画像が選択または撮影されたときに呼ばれるデリゲートメソッド
         func imagePickerController(_ picker: UIImagePickerController, didFinishPickingMediaWithInfo info: [UIImagePickerController.InfoKey: Any]) {
             if let takenImage = info[.originalImage] as? UIImage {
                 parent.image = takenImage
                 
-                // 撮影した画像をカメラロールに保存
-                UIImageWriteToSavedPhotosAlbum(takenImage, nil, nil, nil)
+                if let selectedImage = parent.selectedImage {
+                    parent.image = takenImage.composed(with: selectedImage)
+                }
+                
+                UIImageWriteToSavedPhotosAlbum(parent.image!, nil, nil, nil)
             }
 
-            parent.isImagePickerDisplayed = false
+            picker.dismiss(animated: true)
         }
 
-        // ImagePickerがキャンセルされたときに呼ばれるデリゲートメソッド
         func imagePickerControllerDidCancel(_ picker: UIImagePickerController) {
-            parent.isImagePickerDisplayed = false
+            picker.dismiss(animated: true)
         }
     }
 
-    // SwiftUIからCoordinatorを作成するためのメソッド
     func makeCoordinator() -> Coordinator {
         Coordinator(self)
     }
 
-    // SwiftUIから初めてUIViewControllerが要求されるときに呼ばれるメソッド
     func makeUIViewController(context: Context) -> UIImagePickerController {
         let picker = UIImagePickerController()
         picker.delegate = context.coordinator
         picker.sourceType = .camera
-        picker.cameraOverlayView = UIImageView(image: selectedImage?.withAlpha(0.5))
+        
+        if let selectedImage = selectedImage {
+            let overlayImageView = UIImageView(image: selectedImage)
+            overlayImageView.contentMode = .scaleAspectFit
+            overlayImageView.alpha = 0.5
+            
+            let screenBounds = UIScreen.main.bounds
+            let overlayBounds = CGRect(x: 0, y: (screenBounds.height - screenBounds.width) / 2, width: screenBounds.width, height: screenBounds.width)
+            overlayImageView.frame = overlayBounds
+            
+            picker.cameraOverlayView = overlayImageView
+        }
+        
         return picker
     }
 
-    // SwiftUIがUIViewControllerを更新する必要があるときに呼ばれるメソッド
     func updateUIViewController(_ uiViewController: UIImagePickerController, context: Context) {
-        uiViewController.cameraOverlayView = UIImageView(image: selectedImage?.withAlpha(0.5))
+        if let selectedImage = selectedImage {
+            let overlayImageView = UIImageView(image: selectedImage)
+            overlayImageView.contentMode = .scaleAspectFit
+            overlayImageView.alpha = 0.5
+            
+            let screenBounds = UIScreen.main.bounds
+            let overlayBounds = CGRect(x: 0, y: (screenBounds.height - screenBounds.width) / 2, width: screenBounds.width, height: screenBounds.width)
+            overlayImageView.frame = overlayBounds
+            
+            uiViewController.cameraOverlayView = overlayImageView
+        }
     }
 }
 
-// UIImageを拡張して透明度を調整するメソッドを追加
+
+class CameraViewCoordinator: NSObject, AVCapturePhotoCaptureDelegate {
+    var parent: CameraView
+    var output = AVCapturePhotoOutput()
+
+    init(_ parent: CameraView) {
+        self.parent = parent
+        super.init()
+        if parent.captureSession.canAddOutput(output) {
+            parent.captureSession.addOutput(output)
+        }
+    }
+
+    @objc func takePhoto() {
+        let settings = AVCapturePhotoSettings()
+        output.capturePhoto(with: settings, delegate: self)
+    }
+
+    func photoOutput(_ output: AVCapturePhotoOutput, didFinishProcessingPhoto photo: AVCapturePhoto, error: Error?) {
+        if let imageData = photo.fileDataRepresentation(), let uiImage = UIImage(data: imageData) {
+            let finalImage = uiImage.composed(with: parent.selectedImage)
+            if let finalImageData = finalImage?.jpegData(compressionQuality: 0.8) {
+                UIImageWriteToSavedPhotosAlbum(UIImage(data: finalImageData)!, nil, nil, nil)
+            }
+        }
+    }
+}
+
 extension UIImage {
-    func withAlpha(_ alpha: CGFloat) -> UIImage? {
-        UIGraphicsBeginImageContextWithOptions(size, false, scale)
-        draw(at: .zero, blendMode: .normal, alpha: alpha)
-        let newImage = UIGraphicsGetImageFromCurrentImageContext()
-        UIGraphicsEndImageContext()
-        return newImage
+    func composed(with overlay: UIImage?) -> UIImage? {
+        guard let overlay = overlay else { return self }
+
+        let baseImage = CIImage(image: self)
+        let overlayImage = CIImage(image: overlay)
+
+        guard let filter = CIFilter(name: "CIMinimumCompositing") else {
+            return nil
+        }
+        filter.setValue(overlayImage, forKey: kCIInputImageKey)
+        filter.setValue(baseImage, forKey: kCIInputBackgroundImageKey)
+
+        guard let outputImage = filter.outputImage, let cgImage = CIContext().createCGImage(outputImage, from: outputImage.extent) else {
+            return nil
+        }
+
+        return UIImage(cgImage: cgImage)
     }
 }
