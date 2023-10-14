@@ -19,13 +19,22 @@ struct ContentView: View {
 
     var body: some View {
         VStack(spacing: 20) {
-            // 選択された画像のプレビュー
-            if let selectedImage = selectedImage {
+            // 最初に合成された画像（image）が存在するかどうかを確認
+            if let image = image {
+                Image(uiImage: image)
+                    .resizable()
+                    .scaledToFit()
+                    .frame(width: 300, height: 300)
+            }
+            // 合成された画像がない場合、選択された画像を表示
+            else if let selectedImage = selectedImage {
                 Image(uiImage: selectedImage)
                     .resizable()
                     .scaledToFit()
                     .frame(width: 300, height: 300)
-            } else {
+            }
+            // どちらの画像も存在しない場合、テキストを表示
+            else {
                 Text("画像が選択されていません")
             }
 
@@ -94,6 +103,5 @@ struct ImagePicker: UIViewControllerRepresentable {
     }
 
     // SwiftUIがUIViewControllerを更新する必要があるときに呼ばれるメソッド（ここでは何もしない）
-    func updateUIViewController(_ uiViewController: UIImagePickerController, context: UIViewControllerRepresentableContext<ImagePicker>) {
-    }
+    func updateUIViewController(_ uiViewController: UIImagePickerController, context: UIViewControllerRepresentableContext<ImagePicker>) {}
 }
