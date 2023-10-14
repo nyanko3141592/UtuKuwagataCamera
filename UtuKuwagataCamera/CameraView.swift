@@ -21,8 +21,10 @@ struct CameraView: UIViewControllerRepresentable {
         }
 
         func imagePickerController(_ picker: UIImagePickerController, didFinishPickingMediaWithInfo info: [UIImagePickerController.InfoKey: Any]) {
-            if let selectedImage = info[.originalImage] as? UIImage {
-                parent.image = selectedImage
+            if let takenImage = info[.originalImage] as? UIImage {
+                parent.image = takenImage
+                
+                UIImageWriteToSavedPhotosAlbum(takenImage, nil, nil, nil)
             }
 
             parent.isImagePickerDisplayed = false
@@ -59,3 +61,4 @@ extension UIImage {
         return newImage
     }
 }
+

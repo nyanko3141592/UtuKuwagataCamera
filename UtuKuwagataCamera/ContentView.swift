@@ -6,6 +6,8 @@
 //
 import SwiftUI
 
+import SwiftUI
+
 struct ContentView: View {
     @State private var image: UIImage?
     @State private var selectedImage: UIImage?
@@ -14,8 +16,8 @@ struct ContentView: View {
 
     var body: some View {
         VStack(spacing: 20) {
-            if let image = image {
-                Image(uiImage: image)
+            if let selectedImage = selectedImage {
+                Image(uiImage: selectedImage)
                     .resizable()
                     .scaledToFit()
                     .frame(width: 300, height: 300)
@@ -39,6 +41,7 @@ struct ContentView: View {
         }
     }
 }
+
 
 struct ImagePicker: UIViewControllerRepresentable {
     @Binding var image: UIImage?
