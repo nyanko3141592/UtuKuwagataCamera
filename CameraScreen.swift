@@ -5,10 +5,17 @@ import SwiftUI
 
 struct CameraScreen: View {
     var blendImage: UIImage
+    let offsetMagnification: CGFloat = 1.5
+    
     @State private var dragOffset: CGSize = .zero
     @State private var zoomScale: CGFloat = 1.0
+    @State private var accumulatedDragOffset: CGSize = .zero
+    @State private var showPreview = false
+    @State private var previewImage: UIImage?
+
     @GestureState private var gestureZoomScale: CGFloat = 1.0
     @StateObject private var cameraProvider: CameraProvider
+    @GestureState private var isPressing: Bool = false
     
     init(blendImage: UIImage) {
         self.blendImage = blendImage
@@ -18,33 +25,57 @@ struct CameraScreen: View {
     var body: some View {
         let dragGesture = DragGesture()
             .onChanged { value in
-                dragOffset = value.translation
+                // 累積されたオフセットと新しいオフセットの合計を使用して更新
+                dragOffset = accumulatedDragOffset + value.translation * CGSize(width: offsetMagnification, height: offsetMagnification)
                 cameraProvider.updateZoomAndOffset(zoom: zoomScale * gestureZoomScale, offset: dragOffset)
             }
+            .onEnded { value in
+                accumulatedDragOffset = accumulatedDragOffset + value.translation // ドラッグが終了したら、累積されたオフセットを更新
+            }
             
-               
         let pinchGesture = MagnificationGesture()
             .updating($gestureZoomScale) { value, state, _ in
                 state = value
             }
             .onEnded { value in
-                zoomScale *= value
+                if zoomScale * value <= 1.0 {
+                    zoomScale *= value
+                } else {
+                    zoomScale = 1.0
+                }
             }
         let combinedGesture = dragGesture.simultaneously(with: pinchGesture)
                
         ZStack {
             Color.black.edgesIgnoringSafeArea(.all)
             VStack {
-                if let cameraImg = cameraProvider.cameraImage(for: zoomScale * gestureZoomScale, offset: dragOffset) {
-                    Image(uiImage: cameraImg)
-                        .resizable()
-                        .scaledToFit()
-                        .gesture(combinedGesture)
+                ZStack {
+                    if let cameraImg = cameraProvider.cameraImage(for: zoomScale * gestureZoomScale, offset: dragOffset) {
+                        Image(uiImage: cameraImg)
+                            .resizable()
+                            .scaledToFit()
+                            .gesture(combinedGesture)
+                    }
+                    
+                    if showPreview, let img = previewImage {
+                        Image(uiImage: img)
+                            .resizable()
+                            .scaledToFit()
+                            .transition(.opacity)
+                            .padding()
+                    }
                 }
-
                 
                 Button(action: {
                     cameraProvider.saveImageToPhotosAlbum()
+                    if let capturedImage = cameraProvider.cameraImage {
+                        previewImage = capturedImage
+                        showPreview = true
+                        
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+                            showPreview = false
+                        }
+                    }
                 }) {
                     ZStack {
                         // 外側の円
@@ -84,8 +115,8 @@ class CameraProvider: NSObject, ObservableObject, AVCaptureVideoDataOutputSample
     }
     
     func updateZoomAndOffset(zoom: CGFloat, offset: CGSize) {
-        self.currentZoom = zoom
-        self.currentOffset = offset
+        currentZoom = zoom
+        currentOffset = offset
     }
     
     func setupCaptureSession() {
@@ -131,14 +162,34 @@ class CameraProvider: NSObject, ObservableObject, AVCaptureVideoDataOutputSample
         
         var blendImage = selectedCIImage
         blendImage = blendImage.transformed(by: CGAffineTransform(scaleX: backgroundImage.extent.width / blendImage.extent.width, y: backgroundImage.extent.width / blendImage.extent.width))
-        blendImage = blendImage.transformed(by: CGAffineTransform(scaleX: zoom, y: zoom))
+        if zoom <= 1.0 {
+            blendImage = blendImage.transformed(by: CGAffineTransform(scaleX: zoom, y: zoom))
+        }
         if blendImage.extent.height > ciImage.extent.height {
             blendImage = blendImage.transformed(by: CGAffineTransform(scaleX: backgroundImage.extent.height / blendImage.extent.height, y: backgroundImage.extent.height / blendImage.extent.height))
         }
         // Apply the drag offset
-        blendImage = blendImage.transformed(by: CGAffineTransform(translationX: offset.width, y: -offset.height))
-        blendImage = blendImage.transformed(by: CGAffineTransform(translationX: 0, y: -backgroundImage.extent.height))
-
+        // 高さ制限
+        if offset.height > 0 {
+            // 画面下に飛び出さないようにする
+            blendImage = blendImage.transformed(by: CGAffineTransform(translationX: 0, y: -backgroundImage.extent.height))
+        } else if offset.height < -(backgroundImage.extent.height - blendImage.extent.height) {
+            // 画面上に飛び出さないようにする
+            blendImage = blendImage.transformed(by: CGAffineTransform(translationX: 0, y: -blendImage.extent.height))
+        } else {
+            blendImage = blendImage.transformed(by: CGAffineTransform(translationX: 0, y: -offset.height - backgroundImage.extent.height))
+        }
+        //　幅制限
+        if offset.width < 0 {
+            // 画面左に飛び出さないようにする
+            blendImage = blendImage.transformed(by: CGAffineTransform(translationX: 0, y: 0))
+        } else if offset.width > backgroundImage.extent.width - blendImage.extent.width {
+            // 画面上に飛び出さないようにする
+            blendImage = blendImage.transformed(by: CGAffineTransform(translationX: backgroundImage.extent.width - blendImage.extent.width, y: 0))
+        } else {
+            blendImage = blendImage.transformed(by: CGAffineTransform(translationX: offset.width, y: 0))
+        }
+        
         let composeFilter = CIFilter(name: "CISourceOverCompositing")
         composeFilter?.setValue(blendImage, forKey: kCIInputImageKey)
         composeFilter?.setValue(backgroundImage, forKey: kCIInputBackgroundImageKey)
@@ -151,14 +202,14 @@ class CameraProvider: NSObject, ObservableObject, AVCaptureVideoDataOutputSample
     }
 
     func cameraImage(for zoom: CGFloat, offset: CGSize) -> UIImage? {
-        guard let ciImage = self.currentCIImage else { return nil }
+        guard let ciImage = currentCIImage else { return nil }
         return blendImages(ciImage: ciImage, zoom: zoom, offset: offset)
     }
 
     func captureOutput(_ output: AVCaptureOutput, didOutput sampleBuffer: CMSampleBuffer, from connection: AVCaptureConnection) {
         guard let pixelBuffer = CMSampleBufferGetImageBuffer(sampleBuffer) else { return }
-        self.currentCIImage = CIImage(cvPixelBuffer: pixelBuffer)
-        if let blendedImage = blendImages(ciImage: self.currentCIImage!, zoom: currentZoom, offset: currentOffset) {
+        currentCIImage = CIImage(cvPixelBuffer: pixelBuffer)
+        if let blendedImage = blendImages(ciImage: currentCIImage!, zoom: currentZoom, offset: currentOffset) {
             DispatchQueue.main.async {
                 self.cameraImage = blendedImage
             }
@@ -185,6 +236,6 @@ extension CameraProvider {
     }
 }
 
-#Preview{
-        CameraScreen(blendImage: UIImage(named: "defaultImage")!)
+#Preview {
+    CameraScreen(blendImage: UIImage(named: "defaultImage")!)
 }
