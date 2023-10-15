@@ -11,6 +11,7 @@ struct CameraScreen: View {
     @State private var accumulatedDragOffset: CGSize = .zero
     @GestureState private var gestureZoomScale: CGFloat = 1.0
     @StateObject private var cameraProvider: CameraProvider
+    @GestureState private var isPressing: Bool = false
     
     init(blendImage: UIImage) {
         self.blendImage = blendImage
@@ -33,9 +34,9 @@ struct CameraScreen: View {
                 state = value
             }
             .onEnded { value in
-                if zoomScale * value <= 1.0{
+                if zoomScale * value <= 1.0 {
                     zoomScale *= value
-                }else{
+                } else {
                     zoomScale = 1.0
                 }
             }
@@ -139,7 +140,7 @@ class CameraProvider: NSObject, ObservableObject, AVCaptureVideoDataOutputSample
         
         var blendImage = selectedCIImage
         blendImage = blendImage.transformed(by: CGAffineTransform(scaleX: backgroundImage.extent.width / blendImage.extent.width, y: backgroundImage.extent.width / blendImage.extent.width))
-        if zoom <= 1.0{
+        if zoom <= 1.0 {
             blendImage = blendImage.transformed(by: CGAffineTransform(scaleX: zoom, y: zoom))
         }
         if blendImage.extent.height > ciImage.extent.height {
@@ -150,7 +151,7 @@ class CameraProvider: NSObject, ObservableObject, AVCaptureVideoDataOutputSample
         if offset.height > 0 {
             // 画面下に飛び出さないようにする
             blendImage = blendImage.transformed(by: CGAffineTransform(translationX: 0, y: -backgroundImage.extent.height))
-        } else if offset.height < -(backgroundImage.extent.height - blendImage.extent.height){
+        } else if offset.height < -(backgroundImage.extent.height - blendImage.extent.height) {
             // 画面上に飛び出さないようにする
             blendImage = blendImage.transformed(by: CGAffineTransform(translationX: 0, y: -blendImage.extent.height))
         } else {
@@ -160,7 +161,7 @@ class CameraProvider: NSObject, ObservableObject, AVCaptureVideoDataOutputSample
         if offset.width < 0 {
             // 画面左に飛び出さないようにする
             blendImage = blendImage.transformed(by: CGAffineTransform(translationX: 0, y: 0))
-        } else if offset.width > backgroundImage.extent.width - blendImage.extent.width{
+        } else if offset.width > backgroundImage.extent.width - blendImage.extent.width {
             // 画面上に飛び出さないようにする
             blendImage = blendImage.transformed(by: CGAffineTransform(translationX: backgroundImage.extent.width - blendImage.extent.width, y: 0))
         } else {
