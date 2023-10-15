@@ -5,11 +5,10 @@
 //  Created by 高橋直希 on 2023/10/15.
 //
 
-import SwiftUI
 import AVFoundation
 import CoreImage.CIFilterBuiltins
 import Photos
-
+import SwiftUI
 
 struct CameraScreen: View {
     var blendImage: UIImage
@@ -21,30 +20,37 @@ struct CameraScreen: View {
     }
     
     var body: some View {
-        VStack {
-            if let cameraImg = cameraProvider.cameraImage {
-                Image(uiImage: cameraImg)
-                    .resizable()
-                    .scaledToFit()
+        ZStack {
+            Color.black.edgesIgnoringSafeArea(.all)
+            VStack {
+                if let cameraImg = cameraProvider.cameraImage {
+                    Image(uiImage: cameraImg)
+                        .resizable()
+                        .scaledToFit()
+                }
+                
+                Button(action: {
+                    cameraProvider.saveImageToPhotosAlbum()
+                }) {
+                    ZStack {
+                        // 外側の円
+                        Circle()
+                            .strokeBorder(Color.white, lineWidth: 5)
+                            .background(Circle().fill(Color.clear))
+                            .frame(width: 80, height: 80)
+                                    
+                        // 中心の円
+                        Circle()
+                            .fill(Color.white)
+                            .frame(width: 65, height: 65)
+                    }
+                }
             }
-            
-            Button(action: {
-                cameraProvider.saveImageToPhotosAlbum()
-            }) {
-                Text("Capture")
-                    .bold()
-                    .padding()
-                    .frame(height: 50)
-                    .foregroundColor(Color.white)
-                    .background(Color.blue)
-                    .cornerRadius(25)
-            }
+            .onAppear(perform: cameraProvider.startSession)
+            .onDisappear(perform: cameraProvider.endSession)
         }
-        .onAppear(perform: cameraProvider.startSession)
-        .onDisappear(perform: cameraProvider.endSession)
     }
 }
-
 
 class CameraProvider: NSObject, ObservableObject, AVCaptureVideoDataOutputSampleBufferDelegate {
     @Published var cameraImage: UIImage?
@@ -96,7 +102,6 @@ class CameraProvider: NSObject, ObservableObject, AVCaptureVideoDataOutputSample
         }
     }
     
-    
     func blendImages(ciImage: CIImage) -> UIImage? {
         let selectedCIImage = CIImage(image: blendImage)!
 
@@ -105,10 +110,10 @@ class CameraProvider: NSObject, ObservableObject, AVCaptureVideoDataOutputSample
         backgroundImage = backgroundImage.transformed(by: CGAffineTransform(rotationAngle: -(.pi / 2)))
         var blendImage = selectedCIImage
         blendImage = blendImage.transformed(by: CGAffineTransform(scaleX: backgroundImage.extent.width / blendImage.extent.width, y: backgroundImage.extent.width / blendImage.extent.width))
-        if blendImage.extent.height > ciImage.extent.height{
+        if blendImage.extent.height > ciImage.extent.height {
             blendImage = blendImage.transformed(by: CGAffineTransform(scaleX: backgroundImage.extent.height / blendImage.extent.height, y: backgroundImage.extent.height / blendImage.extent.height))
         }
-        blendImage = blendImage.transformed(by:  CGAffineTransform(translationX: 0, y: -backgroundImage.extent.height))
+        blendImage = blendImage.transformed(by: CGAffineTransform(translationX: 0, y: -backgroundImage.extent.height))
 
         // Using the CISourceOverCompositing filter to blend images
         let composeFilter = CIFilter(name: "CISourceOverCompositing")
@@ -145,7 +150,7 @@ extension CameraProvider {
         
         PHPhotoLibrary.shared().performChanges({
             PHAssetChangeRequest.creationRequestForAsset(from: image)
-        }) { isSuccess, error in
+        }) { _, error in
             if let error = error {
                 print("Error saving photo: \(error.localizedDescription)")
             } else {
@@ -153,4 +158,8 @@ extension CameraProvider {
             }
         }
     }
+}
+
+#Preview {
+    CameraScreen(blendImage: UIImage(named: "defaultImage")!)
 }
