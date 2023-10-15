@@ -6,9 +6,13 @@ import SwiftUI
 struct CameraScreen: View {
     var blendImage: UIImage
     let offsetMagnification: CGFloat = 1.5
+    
     @State private var dragOffset: CGSize = .zero
     @State private var zoomScale: CGFloat = 1.0
     @State private var accumulatedDragOffset: CGSize = .zero
+    @State private var showPreview = false
+    @State private var previewImage: UIImage?
+
     @GestureState private var gestureZoomScale: CGFloat = 1.0
     @StateObject private var cameraProvider: CameraProvider
     @GestureState private var isPressing: Bool = false
@@ -45,15 +49,33 @@ struct CameraScreen: View {
         ZStack {
             Color.black.edgesIgnoringSafeArea(.all)
             VStack {
-                if let cameraImg = cameraProvider.cameraImage(for: zoomScale * gestureZoomScale, offset: dragOffset) {
-                    Image(uiImage: cameraImg)
-                        .resizable()
-                        .scaledToFit()
-                        .gesture(combinedGesture)
+                ZStack {
+                    if let cameraImg = cameraProvider.cameraImage(for: zoomScale * gestureZoomScale, offset: dragOffset) {
+                        Image(uiImage: cameraImg)
+                            .resizable()
+                            .scaledToFit()
+                            .gesture(combinedGesture)
+                    }
+                    
+                    if showPreview, let img = previewImage {
+                        Image(uiImage: img)
+                            .resizable()
+                            .scaledToFit()
+                            .transition(.opacity)
+                            .padding()
+                    }
                 }
-
+                
                 Button(action: {
                     cameraProvider.saveImageToPhotosAlbum()
+                    if let capturedImage = cameraProvider.cameraImage {
+                        previewImage = capturedImage
+                        showPreview = true
+                        
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+                            showPreview = false
+                        }
+                    }
                 }) {
                     ZStack {
                         // 外側の円
