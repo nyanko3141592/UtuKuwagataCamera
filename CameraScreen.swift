@@ -32,7 +32,11 @@ struct CameraScreen: View {
                 state = value
             }
             .onEnded { value in
-                zoomScale *= value
+                if zoomScale * value <= 1.0{
+                    zoomScale *= value
+                }else{
+                    zoomScale = 1.0
+                }
             }
         let combinedGesture = dragGesture.simultaneously(with: pinchGesture)
                
@@ -134,7 +138,9 @@ class CameraProvider: NSObject, ObservableObject, AVCaptureVideoDataOutputSample
         
         var blendImage = selectedCIImage
         blendImage = blendImage.transformed(by: CGAffineTransform(scaleX: backgroundImage.extent.width / blendImage.extent.width, y: backgroundImage.extent.width / blendImage.extent.width))
-        blendImage = blendImage.transformed(by: CGAffineTransform(scaleX: zoom, y: zoom))
+        if zoom <= 1.0{
+            blendImage = blendImage.transformed(by: CGAffineTransform(scaleX: zoom, y: zoom))
+        }
         if blendImage.extent.height > ciImage.extent.height {
             blendImage = blendImage.transformed(by: CGAffineTransform(scaleX: backgroundImage.extent.height / blendImage.extent.height, y: backgroundImage.extent.height / blendImage.extent.height))
         }
