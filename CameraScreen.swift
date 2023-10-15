@@ -5,6 +5,7 @@ import SwiftUI
 
 struct CameraScreen: View {
     var blendImage: UIImage
+    let offsetMagnification: CGFloat = 1.5
     @State private var dragOffset: CGSize = .zero
     @State private var zoomScale: CGFloat = 1.0
     @State private var accumulatedDragOffset: CGSize = .zero
@@ -20,7 +21,7 @@ struct CameraScreen: View {
         let dragGesture = DragGesture()
             .onChanged { value in
                 // 累積されたオフセットと新しいオフセットの合計を使用して更新
-                dragOffset = accumulatedDragOffset + value.translation
+                dragOffset = accumulatedDragOffset + value.translation * CGSize(width: offsetMagnification, height: offsetMagnification)
                 cameraProvider.updateZoomAndOffset(zoom: zoomScale * gestureZoomScale, offset: dragOffset)
             }
             .onEnded { value in
