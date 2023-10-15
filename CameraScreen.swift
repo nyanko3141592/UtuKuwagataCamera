@@ -1,10 +1,3 @@
-//
-//  CameraView.swift
-//  UtuKuwagataCamera
-//
-//  Created by 高橋直希 on 2023/10/15.
-//
-
 import AVFoundation
 import CoreImage.CIFilterBuiltins
 import Photos
@@ -40,11 +33,11 @@ struct CameraScreen: View {
         ZStack {
             Color.black.edgesIgnoringSafeArea(.all)
             VStack {
-                if let cameraImg = cameraProvider.cameraImage {
+                if let cameraImg = cameraProvider.cameraImage(for: zoomScale * gestureZoomScale) {
                     Image(uiImage: cameraImg)
                         .resizable()
                         .scaledToFit()
-                    
+                        .gesture(combinedGesture)
                 }
                 
                 Button(action: {
@@ -77,6 +70,7 @@ class CameraProvider: NSObject, ObservableObject, AVCaptureVideoDataOutputSample
     private let videoDataOutput = AVCaptureVideoDataOutput()
     private let queue = DispatchQueue(label: "CameraQueue")
     private let blendImage: UIImage
+    private var currentCIImage: CIImage?
     
     init(blendImage: UIImage) {
         self.blendImage = blendImage
@@ -120,38 +114,38 @@ class CameraProvider: NSObject, ObservableObject, AVCaptureVideoDataOutputSample
         }
     }
     
-    func blendImages(ciImage: CIImage) -> UIImage? {
+    func blendImages(ciImage: CIImage, zoom: CGFloat) -> UIImage? {
         let selectedCIImage = CIImage(image: blendImage)!
-
-        // 90 degree rotation transformation
         var backgroundImage = ciImage
         backgroundImage = backgroundImage.transformed(by: CGAffineTransform(rotationAngle: -(.pi / 2)))
         var blendImage = selectedCIImage
         blendImage = blendImage.transformed(by: CGAffineTransform(scaleX: backgroundImage.extent.width / blendImage.extent.width, y: backgroundImage.extent.width / blendImage.extent.width))
+        blendImage = blendImage.transformed(by: CGAffineTransform(scaleX: zoom, y: zoom))
         if blendImage.extent.height > ciImage.extent.height {
             blendImage = blendImage.transformed(by: CGAffineTransform(scaleX: backgroundImage.extent.height / blendImage.extent.height, y: backgroundImage.extent.height / blendImage.extent.height))
         }
         blendImage = blendImage.transformed(by: CGAffineTransform(translationX: 0, y: -backgroundImage.extent.height))
 
-        // Using the CISourceOverCompositing filter to blend images
         let composeFilter = CIFilter(name: "CISourceOverCompositing")
         composeFilter?.setValue(blendImage, forKey: kCIInputImageKey)
         composeFilter?.setValue(backgroundImage, forKey: kCIInputBackgroundImageKey)
-
-        // Fetching the output after passing through the filter
+        
         guard let outputCIImage = composeFilter?.outputImage else { return nil }
         
-        // Convert CIImage to UIImage
         let context = CIContext()
         guard let cgImage = context.createCGImage(outputCIImage, from: outputCIImage.extent) else { return nil }
         return UIImage(cgImage: cgImage)
     }
 
+    func cameraImage(for zoom: CGFloat) -> UIImage? {
+        guard let ciImage = self.currentCIImage else { return nil }
+        return blendImages(ciImage: ciImage, zoom: zoom)
+    }
+
     func captureOutput(_ output: AVCaptureOutput, didOutput sampleBuffer: CMSampleBuffer, from connection: AVCaptureConnection) {
         guard let pixelBuffer = CMSampleBufferGetImageBuffer(sampleBuffer) else { return }
-        
-        let cameraImage = CIImage(cvPixelBuffer: pixelBuffer)
-        if let blendedImage = blendImages(ciImage: cameraImage) {
+        self.currentCIImage = CIImage(cvPixelBuffer: pixelBuffer)
+        if let blendedImage = blendImages(ciImage: self.currentCIImage!, zoom: 1.0) {
             DispatchQueue.main.async {
                 self.cameraImage = blendedImage
             }
@@ -178,6 +172,6 @@ extension CameraProvider {
     }
 }
 
-#Preview {
-    CameraScreen(blendImage: UIImage(named: "defaultImage")!)
+#Preview{
+        CameraScreen(blendImage: UIImage(named: "defaultImage")!)
 }
