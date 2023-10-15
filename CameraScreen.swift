@@ -139,10 +139,25 @@ class CameraProvider: NSObject, ObservableObject, AVCaptureVideoDataOutputSample
             blendImage = blendImage.transformed(by: CGAffineTransform(scaleX: backgroundImage.extent.height / blendImage.extent.height, y: backgroundImage.extent.height / blendImage.extent.height))
         }
         // Apply the drag offset
+        // 高さ制限
         if offset.height > 0 {
-            blendImage = blendImage.transformed(by: CGAffineTransform(translationX: offset.width, y: -backgroundImage.extent.height))
+            // 画面下に飛び出さないようにする
+            blendImage = blendImage.transformed(by: CGAffineTransform(translationX: 0, y: -backgroundImage.extent.height))
+        } else if offset.height < -(backgroundImage.extent.height - blendImage.extent.height){
+            // 画面上に飛び出さないようにする
+            blendImage = blendImage.transformed(by: CGAffineTransform(translationX: 0, y: -blendImage.extent.height))
         } else {
-            blendImage = blendImage.transformed(by: CGAffineTransform(translationX: offset.width, y: -offset.height - backgroundImage.extent.height))
+            blendImage = blendImage.transformed(by: CGAffineTransform(translationX: 0, y: -offset.height - backgroundImage.extent.height))
+        }
+        //　幅制限
+        if offset.width < 0 {
+            // 画面左に飛び出さないようにする
+            blendImage = blendImage.transformed(by: CGAffineTransform(translationX: 0, y: 0))
+        } else if offset.width > backgroundImage.extent.width - blendImage.extent.width{
+            // 画面上に飛び出さないようにする
+            blendImage = blendImage.transformed(by: CGAffineTransform(translationX: backgroundImage.extent.width - blendImage.extent.width, y: 0))
+        } else {
+            blendImage = blendImage.transformed(by: CGAffineTransform(translationX: offset.width, y: 0))
         }
         
         let composeFilter = CIFilter(name: "CISourceOverCompositing")
