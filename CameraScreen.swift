@@ -7,6 +7,7 @@ struct CameraScreen: View {
     var blendImage: UIImage
     @State private var dragOffset: CGSize = .zero
     @State private var zoomScale: CGFloat = 1.0
+    @State private var accumulatedDragOffset: CGSize = .zero
     @GestureState private var gestureZoomScale: CGFloat = 1.0
     @StateObject private var cameraProvider: CameraProvider
     
@@ -18,11 +19,14 @@ struct CameraScreen: View {
     var body: some View {
         let dragGesture = DragGesture()
             .onChanged { value in
-                dragOffset = value.translation
+                // 累積されたオフセットと新しいオフセットの合計を使用して更新
+                dragOffset = accumulatedDragOffset + value.translation
                 cameraProvider.updateZoomAndOffset(zoom: zoomScale * gestureZoomScale, offset: dragOffset)
             }
+            .onEnded { value in
+                accumulatedDragOffset = accumulatedDragOffset + value.translation // ドラッグが終了したら、累積されたオフセットを更新
+            }
             
-               
         let pinchGesture = MagnificationGesture()
             .updating($gestureZoomScale) { value, state, _ in
                 state = value
@@ -42,7 +46,6 @@ struct CameraScreen: View {
                         .gesture(combinedGesture)
                 }
 
-                
                 Button(action: {
                     cameraProvider.saveImageToPhotosAlbum()
                 }) {
@@ -84,8 +87,8 @@ class CameraProvider: NSObject, ObservableObject, AVCaptureVideoDataOutputSample
     }
     
     func updateZoomAndOffset(zoom: CGFloat, offset: CGSize) {
-        self.currentZoom = zoom
-        self.currentOffset = offset
+        currentZoom = zoom
+        currentOffset = offset
     }
     
     func setupCaptureSession() {
@@ -136,8 +139,12 @@ class CameraProvider: NSObject, ObservableObject, AVCaptureVideoDataOutputSample
             blendImage = blendImage.transformed(by: CGAffineTransform(scaleX: backgroundImage.extent.height / blendImage.extent.height, y: backgroundImage.extent.height / blendImage.extent.height))
         }
         // Apply the drag offset
-        blendImage = blendImage.transformed(by: CGAffineTransform(translationX: offset.width, y: -offset.height - backgroundImage.extent.height))
-
+        if offset.height > 0 {
+            blendImage = blendImage.transformed(by: CGAffineTransform(translationX: offset.width, y: -backgroundImage.extent.height))
+        } else {
+            blendImage = blendImage.transformed(by: CGAffineTransform(translationX: offset.width, y: -offset.height - backgroundImage.extent.height))
+        }
+        
         let composeFilter = CIFilter(name: "CISourceOverCompositing")
         composeFilter?.setValue(blendImage, forKey: kCIInputImageKey)
         composeFilter?.setValue(backgroundImage, forKey: kCIInputBackgroundImageKey)
@@ -150,14 +157,14 @@ class CameraProvider: NSObject, ObservableObject, AVCaptureVideoDataOutputSample
     }
 
     func cameraImage(for zoom: CGFloat, offset: CGSize) -> UIImage? {
-        guard let ciImage = self.currentCIImage else { return nil }
+        guard let ciImage = currentCIImage else { return nil }
         return blendImages(ciImage: ciImage, zoom: zoom, offset: offset)
     }
 
     func captureOutput(_ output: AVCaptureOutput, didOutput sampleBuffer: CMSampleBuffer, from connection: AVCaptureConnection) {
         guard let pixelBuffer = CMSampleBufferGetImageBuffer(sampleBuffer) else { return }
-        self.currentCIImage = CIImage(cvPixelBuffer: pixelBuffer)
-        if let blendedImage = blendImages(ciImage: self.currentCIImage!, zoom: currentZoom, offset: currentOffset) {
+        currentCIImage = CIImage(cvPixelBuffer: pixelBuffer)
+        if let blendedImage = blendImages(ciImage: currentCIImage!, zoom: currentZoom, offset: currentOffset) {
             DispatchQueue.main.async {
                 self.cameraImage = blendedImage
             }
@@ -184,6 +191,6 @@ extension CameraProvider {
     }
 }
 
-#Preview{
-        CameraScreen(blendImage: UIImage(named: "defaultImage")!)
+#Preview {
+    CameraScreen(blendImage: UIImage(named: "defaultImage")!)
 }
