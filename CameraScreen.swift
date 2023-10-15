@@ -136,8 +136,7 @@ class CameraProvider: NSObject, ObservableObject, AVCaptureVideoDataOutputSample
             blendImage = blendImage.transformed(by: CGAffineTransform(scaleX: backgroundImage.extent.height / blendImage.extent.height, y: backgroundImage.extent.height / blendImage.extent.height))
         }
         // Apply the drag offset
-        blendImage = blendImage.transformed(by: CGAffineTransform(translationX: offset.width, y: -offset.height))
-        blendImage = blendImage.transformed(by: CGAffineTransform(translationX: 0, y: -backgroundImage.extent.height))
+        blendImage = blendImage.transformed(by: CGAffineTransform(translationX: offset.width, y: -offset.height - backgroundImage.extent.height))
 
         let composeFilter = CIFilter(name: "CISourceOverCompositing")
         composeFilter?.setValue(blendImage, forKey: kCIInputImageKey)
