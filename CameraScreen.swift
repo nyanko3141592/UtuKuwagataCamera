@@ -108,7 +108,7 @@ class CameraProvider: NSObject, ObservableObject, AVCaptureVideoDataOutputSample
         if blendImage.extent.height > ciImage.extent.height{
             blendImage = blendImage.transformed(by: CGAffineTransform(scaleX: backgroundImage.extent.height / blendImage.extent.height, y: backgroundImage.extent.height / blendImage.extent.height))
         }
-        blendImage = blendImage.transformed(by:  CGAffineTransform(translationX: 0, y: -ciImage.extent.height - selectedCIImage.extent.height))
+        blendImage = blendImage.transformed(by:  CGAffineTransform(translationX: 0, y: -backgroundImage.extent.height))
 
         // Using the CISourceOverCompositing filter to blend images
         let composeFilter = CIFilter(name: "CISourceOverCompositing")
