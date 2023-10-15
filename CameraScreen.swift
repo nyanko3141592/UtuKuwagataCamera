@@ -1,10 +1,3 @@
-//
-//  CameraView.swift
-//  UtuKuwagataCamera
-//
-//  Created by 高橋直希 on 2023/10/15.
-//
-
 import AVFoundation
 import CoreImage.CIFilterBuiltins
 import Photos
@@ -12,6 +5,9 @@ import SwiftUI
 
 struct CameraScreen: View {
     var blendImage: UIImage
+    @State private var dragOffset: CGSize = .zero
+    @State private var zoomScale: CGFloat = 1.0
+    @GestureState private var gestureZoomScale: CGFloat = 1.0
     @StateObject private var cameraProvider: CameraProvider
     
     init(blendImage: UIImage) {
@@ -20,14 +16,32 @@ struct CameraScreen: View {
     }
     
     var body: some View {
+        let dragGesture = DragGesture()
+            .onChanged { value in
+                dragOffset = value.translation
+                cameraProvider.updateZoomAndOffset(zoom: zoomScale * gestureZoomScale, offset: dragOffset)
+            }
+            
+               
+        let pinchGesture = MagnificationGesture()
+            .updating($gestureZoomScale) { value, state, _ in
+                state = value
+            }
+            .onEnded { value in
+                zoomScale *= value
+            }
+        let combinedGesture = dragGesture.simultaneously(with: pinchGesture)
+               
         ZStack {
             Color.black.edgesIgnoringSafeArea(.all)
             VStack {
-                if let cameraImg = cameraProvider.cameraImage {
+                if let cameraImg = cameraProvider.cameraImage(for: zoomScale * gestureZoomScale, offset: dragOffset) {
                     Image(uiImage: cameraImg)
                         .resizable()
                         .scaledToFit()
+                        .gesture(combinedGesture)
                 }
+
                 
                 Button(action: {
                     cameraProvider.saveImageToPhotosAlbum()
@@ -55,15 +69,23 @@ struct CameraScreen: View {
 class CameraProvider: NSObject, ObservableObject, AVCaptureVideoDataOutputSampleBufferDelegate {
     @Published var cameraImage: UIImage?
     
+    private var currentZoom: CGFloat = 1.0
+    private var currentOffset: CGSize = .zero
     private let captureSession = AVCaptureSession()
     private let videoDataOutput = AVCaptureVideoDataOutput()
     private let queue = DispatchQueue(label: "CameraQueue")
     private let blendImage: UIImage
+    private var currentCIImage: CIImage?
     
     init(blendImage: UIImage) {
         self.blendImage = blendImage
         super.init()
         setupCaptureSession()
+    }
+    
+    func updateZoomAndOffset(zoom: CGFloat, offset: CGSize) {
+        self.currentZoom = zoom
+        self.currentOffset = offset
     }
     
     func setupCaptureSession() {
@@ -102,38 +124,41 @@ class CameraProvider: NSObject, ObservableObject, AVCaptureVideoDataOutputSample
         }
     }
     
-    func blendImages(ciImage: CIImage) -> UIImage? {
+    func blendImages(ciImage: CIImage, zoom: CGFloat, offset: CGSize) -> UIImage? {
         let selectedCIImage = CIImage(image: blendImage)!
-
-        // 90 degree rotation transformation
         var backgroundImage = ciImage
         backgroundImage = backgroundImage.transformed(by: CGAffineTransform(rotationAngle: -(.pi / 2)))
+        
         var blendImage = selectedCIImage
         blendImage = blendImage.transformed(by: CGAffineTransform(scaleX: backgroundImage.extent.width / blendImage.extent.width, y: backgroundImage.extent.width / blendImage.extent.width))
+        blendImage = blendImage.transformed(by: CGAffineTransform(scaleX: zoom, y: zoom))
         if blendImage.extent.height > ciImage.extent.height {
             blendImage = blendImage.transformed(by: CGAffineTransform(scaleX: backgroundImage.extent.height / blendImage.extent.height, y: backgroundImage.extent.height / blendImage.extent.height))
         }
+        // Apply the drag offset
+        blendImage = blendImage.transformed(by: CGAffineTransform(translationX: offset.width, y: -offset.height))
         blendImage = blendImage.transformed(by: CGAffineTransform(translationX: 0, y: -backgroundImage.extent.height))
 
-        // Using the CISourceOverCompositing filter to blend images
         let composeFilter = CIFilter(name: "CISourceOverCompositing")
         composeFilter?.setValue(blendImage, forKey: kCIInputImageKey)
         composeFilter?.setValue(backgroundImage, forKey: kCIInputBackgroundImageKey)
-
-        // Fetching the output after passing through the filter
+        
         guard let outputCIImage = composeFilter?.outputImage else { return nil }
         
-        // Convert CIImage to UIImage
         let context = CIContext()
         guard let cgImage = context.createCGImage(outputCIImage, from: outputCIImage.extent) else { return nil }
         return UIImage(cgImage: cgImage)
     }
 
+    func cameraImage(for zoom: CGFloat, offset: CGSize) -> UIImage? {
+        guard let ciImage = self.currentCIImage else { return nil }
+        return blendImages(ciImage: ciImage, zoom: zoom, offset: offset)
+    }
+
     func captureOutput(_ output: AVCaptureOutput, didOutput sampleBuffer: CMSampleBuffer, from connection: AVCaptureConnection) {
         guard let pixelBuffer = CMSampleBufferGetImageBuffer(sampleBuffer) else { return }
-        
-        let cameraImage = CIImage(cvPixelBuffer: pixelBuffer)
-        if let blendedImage = blendImages(ciImage: cameraImage) {
+        self.currentCIImage = CIImage(cvPixelBuffer: pixelBuffer)
+        if let blendedImage = blendImages(ciImage: self.currentCIImage!, zoom: currentZoom, offset: currentOffset) {
             DispatchQueue.main.async {
                 self.cameraImage = blendedImage
             }
@@ -160,6 +185,6 @@ extension CameraProvider {
     }
 }
 
-#Preview {
-    CameraScreen(blendImage: UIImage(named: "defaultImage")!)
+#Preview{
+        CameraScreen(blendImage: UIImage(named: "defaultImage")!)
 }
