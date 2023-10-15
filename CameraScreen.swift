@@ -12,6 +12,9 @@ import SwiftUI
 
 struct CameraScreen: View {
     var blendImage: UIImage
+    @State private var dragOffset: CGSize = .zero
+    @State private var zoomScale: CGFloat = 1.0
+    @GestureState private var gestureZoomScale: CGFloat = 1.0
     @StateObject private var cameraProvider: CameraProvider
     
     init(blendImage: UIImage) {
@@ -20,6 +23,20 @@ struct CameraScreen: View {
     }
     
     var body: some View {
+        let dragGesture = DragGesture()
+            .onChanged { value in
+                dragOffset = value.translation
+            }
+               
+        let pinchGesture = MagnificationGesture()
+            .updating($gestureZoomScale) { value, state, _ in
+                state = value
+            }
+            .onEnded { value in
+                zoomScale *= value
+            }
+        let combinedGesture = dragGesture.simultaneously(with: pinchGesture)
+               
         ZStack {
             Color.black.edgesIgnoringSafeArea(.all)
             VStack {
@@ -27,6 +44,7 @@ struct CameraScreen: View {
                     Image(uiImage: cameraImg)
                         .resizable()
                         .scaledToFit()
+                    
                 }
                 
                 Button(action: {
